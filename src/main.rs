@@ -8,8 +8,14 @@
 //! - 'DELETE /todos/:id': delete a specific Todo
 //!
 
-use axum::{extract::State, response::IntoResponse, routing::get, Json, Router};
-use serde::Serialize;
+use axum::{
+    extract::State,
+    http::StatusCode,
+    response::IntoResponse,
+    routing::{get, post},
+    Json, Router,
+};
+use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     net::SocketAddr,
@@ -22,6 +28,7 @@ async fn main() {
     let db = Db::default();
     let app = Router::new()
         .route("/todos", get(todos_index))
+        .route("/todos", post(todos_create))
         .with_state(db);
 
     let address = SocketAddr::from(([127, 0, 0, 1], 3000));
@@ -34,11 +41,7 @@ async fn main() {
     // to learn
 }
 
-async fn todos_index(State(db): State<Db>) -> impl IntoResponse {
-    let todos = db.read().unwrap();
-    let todos = todos.values().cloned().collect::<Vec<_>>();
-    Json(todos)
-}
+type Db = Arc<RwLock<HashMap<Uuid, Todo>>>;
 
 #[derive(Debug, Serialize, Clone)]
 struct Todo {
@@ -47,4 +50,23 @@ struct Todo {
     completed: bool,
 }
 
-type Db = Arc<RwLock<HashMap<Uuid, Todo>>>;
+async fn todos_index(State(db): State<Db>) -> impl IntoResponse {
+    let todos = db.read().unwrap();
+    let todos = todos.values().cloned().collect::<Vec<_>>();
+    Json(todos)
+}
+
+#[derive(Debug, Deserialize)]
+struct CreateTodo {
+    text: String,
+}
+
+async fn todos_create(State(db): State<Db>, Json(input): Json<CreateTodo>) -> impl IntoResponse {
+    let todo = Todo {
+        id: Uuid::new_v4(),
+        text: input.text,
+        completed: false,
+    };
+    db.write().unwrap().insert(todo.id, todo.clone());
+    (StatusCode::CREATED, Json(todo))
+}
