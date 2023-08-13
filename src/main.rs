@@ -16,6 +16,7 @@ use axum::{
     Json, Router,
 };
 use dotenvy::dotenv;
+use sea_orm::Database;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::{
@@ -30,6 +31,8 @@ async fn main() {
     dotenv().ok();
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     println!("database_url = {database_url}");
+
+    let database = Database::connect(database_url).await;
 
     let db = Db::default();
     let app = Router::new()
