@@ -15,7 +15,9 @@ use axum::{
     routing::{delete, get, post, put},
     Json, Router,
 };
+use dotenvy::dotenv;
 use serde::{Deserialize, Serialize};
+use std::env;
 use std::{
     collections::HashMap,
     net::SocketAddr,
@@ -25,6 +27,10 @@ use uuid::Uuid;
 
 #[tokio::main]
 async fn main() {
+    dotenv().ok();
+    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    println!("database_url = {database_url}");
+
     let db = Db::default();
     let app = Router::new()
         .route("/todos", get(todos_index))
