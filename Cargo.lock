@@ -2953,7 +2953,6 @@ dependencies = [
  "axum",
  "dotenvy",
  "dotenvy_macro",
- "reqwest",
  "sea-orm",
  "serde",
  "todo-list-api",
