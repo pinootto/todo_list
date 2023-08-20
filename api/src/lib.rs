@@ -16,6 +16,7 @@ use axum::{
     Json, Router,
 };
 use dotenvy::dotenv;
+use reqwest;
 use sea_orm::Database;
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -28,6 +29,14 @@ use uuid::Uuid;
 
 #[tokio::main]
 pub async fn main() {
+    // http://45.32.115.191/
+    let body = reqwest::get("https://www.rust-lang.org")
+        .await?
+        .text()
+        .await?;
+
+    println!("body = {:?}", body);
+
     dotenv().ok();
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     println!("database_url = {database_url}");

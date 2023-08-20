@@ -22,3 +22,4 @@ tower-http = { version = "0.4.3", features = ["add-extension", "trace"] }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 uuid = { version = "1.4.1", features = ["serde", "v4"] }
+reqwest = "0.11.18"
