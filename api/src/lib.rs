@@ -29,13 +29,12 @@ use uuid::Uuid;
 
 #[tokio::main]
 pub async fn main() {
-    // http://45.32.115.191/
-    let body = reqwest::get("https://www.rust-lang.org")
-        .await?
-        .text()
-        .await?;
-
-    println!("body = {:?}", body);
+    // let text = match get_from_url("http://45.32.115.191/").await {
+    let text = match get_from_url("https://magzdar.net/").await {
+        Ok(t) => t,
+        Err(err) => format!("WARN: text not found - {err}"),
+    };
+    println!("text = {text}");
 
     dotenv().ok();
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
@@ -59,6 +58,12 @@ pub async fn main() {
 
     // to continue
     // to learn
+}
+
+async fn get_from_url(url: &str) -> Result<String, reqwest::Error> {
+    let body = reqwest::get(url).await?.text().await?;
+    println!("body = {:?}", body);
+    Ok(body)
 }
 
 type Db = Arc<RwLock<HashMap<Uuid, Todo>>>;

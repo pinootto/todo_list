@@ -2935,6 +2935,7 @@ dependencies = [
  "dotenvy_macro",
  "entity",
  "migration",
+ "reqwest",
  "sea-orm",
  "serde",
  "tokio",
