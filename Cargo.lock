@@ -2950,18 +2950,7 @@ dependencies = [
 name = "todo_list"
 version = "0.1.0"
 dependencies = [
- "axum",
- "dotenvy",
- "dotenvy_macro",
- "sea-orm",
- "serde",
  "todo-list-api",
- "tokio",
- "tower",
- "tower-http",
- "tracing",
- "tracing-subscriber",
- "uuid",
 ]
 
 [[package]]
