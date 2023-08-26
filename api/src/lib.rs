@@ -15,9 +15,14 @@ use axum::{
     routing::{delete, get, post, put},
     Json, Router,
 };
+use data_service::{
+    sea_orm::{Database, DatabaseConnection},
+    Mutation as MutationCore, Query as QueryCore,
+};
 use dotenvy::dotenv;
 use reqwest;
-use sea_orm::Database;
+// use sea_orm::Database;
+use entity::todo;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::{
@@ -40,24 +45,26 @@ pub async fn main() {
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     println!("database_url = {database_url}");
 
-    let database = Database::connect(database_url).await;
+    let database_conn = Database::connect(database_url)
+        .await
+        .expect("Database connection failed");
 
-    let db = Db::default();
+    let state = AppState {
+        conn: database_conn,
+    };
+
     let app = Router::new()
         .route("/todos", get(todos_index))
         .route("/todos", post(todos_create))
-        .route("/todos/:id", put(todos_update))
-        .route("/todos/:id", delete(todos_delete))
-        .with_state(db);
+        // .route("/todos/:id", put(todos_update))
+        // .route("/todos/:id", delete(todos_delete))
+        .with_state(state);
 
     let address = SocketAddr::from(([127, 0, 0, 1], 3000));
     axum::Server::bind(&address)
         .serve(app.into_make_service())
         .await
         .unwrap();
-
-    // to continue
-    // to learn
 }
 
 async fn get_from_url(url: &str) -> Result<String, reqwest::Error> {
@@ -66,19 +73,31 @@ async fn get_from_url(url: &str) -> Result<String, reqwest::Error> {
     Ok(body)
 }
 
-type Db = Arc<RwLock<HashMap<Uuid, Todo>>>;
+#[derive(Clone)]
+struct AppState {
+    conn: DatabaseConnection,
+}
 
 #[derive(Debug, Serialize, Clone)]
 struct Todo {
-    id: Uuid,
+    id: i32,
     text: String,
     completed: bool,
 }
 
-async fn todos_index(State(db): State<Db>) -> impl IntoResponse {
-    let todos = db.read().unwrap();
-    let todos = todos.values().cloned().collect::<Vec<_>>();
-    Json(todos)
+async fn todos_index(state: State<AppState>) -> impl IntoResponse {
+    let todos = QueryCore::find_all_todos(&state.conn)
+        .await
+        .expect("Cannot find todos");
+    let todo_list = todos
+        .iter()
+        .map(|todo| Todo {
+            id: todo.id,
+            text: todo.text.clone(),
+            completed: todo.completed,
+        })
+        .collect::<Vec<_>>();
+    Json(todo_list)
 }
 
 #[derive(Debug, Deserialize)]
@@ -86,13 +105,27 @@ struct CreateTodo {
     text: String,
 }
 
-async fn todos_create(State(db): State<Db>, Json(input): Json<CreateTodo>) -> impl IntoResponse {
+async fn todos_create(state: State<AppState>, Json(input): Json<CreateTodo>) -> impl IntoResponse {
+    let active_model = MutationCore::create_todo(
+        &state.conn,
+        entity::todo::Model {
+            id: 0,
+            text: input.text,
+            completed: false,
+        },
+    )
+    .await
+    .expect("Cannot create todo");
+
+    // println!("{:#?}", active_model);
+    // println!("{:#?}", active_model.id.unwrap());
+    // let model: entity::todo::Model = active_model.try_into_model().unwrap();
+    //
     let todo = Todo {
-        id: Uuid::new_v4(),
-        text: input.text,
-        completed: false,
+        id: active_model.id.unwrap(),
+        text: active_model.text.unwrap(),
+        completed: active_model.completed.unwrap(),
     };
-    db.write().unwrap().insert(todo.id, todo.clone());
     (StatusCode::CREATED, Json(todo))
 }
 
@@ -102,35 +135,35 @@ struct UpdateTodo {
     completed: Option<bool>,
 }
 
-async fn todos_update(
-    Path(id): Path<Uuid>,
-    State(db): State<Db>,
-    Json(input): Json<UpdateTodo>,
-) -> Result<impl IntoResponse, StatusCode> {
-    let mut todo = db
-        .read()
-        .unwrap()
-        .get(&id)
-        .cloned()
-        .ok_or(StatusCode::NOT_FOUND)?;
-    if let Some(text) = input.text {
-        todo.text = text;
-    }
-    if let Some(completed) = input.completed {
-        todo.completed = completed;
-    }
-    db.write().unwrap().insert(todo.id, todo.clone());
-    Ok(Json(todo))
-}
-
-async fn todos_delete(Path(id): Path<Uuid>, State(db): State<Db>) -> impl IntoResponse {
-    if db.write().unwrap().remove(&id).is_some() {
-        StatusCode::NO_CONTENT
-    } else {
-        StatusCode::NOT_FOUND
-    }
-}
-
+// async fn todos_update(
+//     Path(id): Path<Uuid>,
+//     State(db): State<Db>,
+//     Json(input): Json<UpdateTodo>,
+// ) -> Result<impl IntoResponse, StatusCode> {
+//     let mut todo = db
+//         .read()
+//         .unwrap()
+//         .get(&id)
+//         .cloned()
+//         .ok_or(StatusCode::NOT_FOUND)?;
+//     if let Some(text) = input.text {
+//         todo.text = text;
+//     }
+//     if let Some(completed) = input.completed {
+//         todo.completed = completed;
+//     }
+//     db.write().unwrap().insert(todo.id, todo.clone());
+//     Ok(Json(todo))
+// }
+//
+// async fn todos_delete(Path(id): Path<Uuid>, State(db): State<Db>) -> impl IntoResponse {
+//     if db.write().unwrap().remove(&id).is_some() {
+//         StatusCode::NO_CONTENT
+//     } else {
+//         StatusCode::NOT_FOUND
+//     }
+// }
+//
 pub fn add(left: usize, right: usize) -> usize {
     left + right
 }

@@ -6,3 +6,14 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+entity = { path = "../entity" }
+
+[dependencies.sea-orm]
+version = "0.12.2" # sea-orm version
+features = [
+    "debug-print",
+    "runtime-tokio-native-tls",
+    "sqlx-postgres",
+    # "sqlx-mysql",
+    # "sqlx-sqlite",
+]
