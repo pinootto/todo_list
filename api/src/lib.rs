@@ -8,6 +8,7 @@
 //! - 'DELETE /todos/:id': delete a specific Todo
 //!
 
+use ::entity::todo;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -21,8 +22,6 @@ use data_service::{
 };
 use dotenvy::dotenv;
 use reqwest;
-// use sea_orm::Database;
-use entity::todo;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::{
@@ -56,7 +55,7 @@ pub async fn main() {
     let app = Router::new()
         .route("/todos", get(todos_index))
         .route("/todos", post(todos_create))
-        // .route("/todos/:id", put(todos_update))
+        .route("/todos/:id", put(todos_update))
         // .route("/todos/:id", delete(todos_delete))
         .with_state(state);
 
@@ -85,7 +84,7 @@ struct Todo {
     completed: bool,
 }
 
-async fn todos_index(state: State<AppState>) -> impl IntoResponse {
+async fn todos_index(State(state): State<AppState>) -> impl IntoResponse {
     let todos = QueryCore::find_all_todos(&state.conn)
         .await
         .expect("Cannot find todos");
@@ -105,10 +104,13 @@ struct CreateTodo {
     text: String,
 }
 
-async fn todos_create(state: State<AppState>, Json(input): Json<CreateTodo>) -> impl IntoResponse {
+async fn todos_create(
+    State(state): State<AppState>,
+    Json(input): Json<CreateTodo>,
+) -> impl IntoResponse {
     let active_model = MutationCore::create_todo(
         &state.conn,
-        entity::todo::Model {
+        todo::Model {
             id: 0,
             text: input.text,
             completed: false,
@@ -135,27 +137,42 @@ struct UpdateTodo {
     completed: Option<bool>,
 }
 
-// async fn todos_update(
-//     Path(id): Path<Uuid>,
-//     State(db): State<Db>,
-//     Json(input): Json<UpdateTodo>,
-// ) -> Result<impl IntoResponse, StatusCode> {
-//     let mut todo = db
-//         .read()
-//         .unwrap()
-//         .get(&id)
-//         .cloned()
-//         .ok_or(StatusCode::NOT_FOUND)?;
-//     if let Some(text) = input.text {
-//         todo.text = text;
-//     }
-//     if let Some(completed) = input.completed {
-//         todo.completed = completed;
-//     }
-//     db.write().unwrap().insert(todo.id, todo.clone());
-//     Ok(Json(todo))
-// }
-//
+async fn todos_update(
+    Path(id): Path<i32>,
+    State(state): State<AppState>,
+    Json(input): Json<UpdateTodo>,
+) -> Result<impl IntoResponse, StatusCode> {
+    let found_model = QueryCore::find_todo_by_id(&state.conn, id)
+        .await
+        .expect(&format!("Cannot find todo by id {}", id));
+    let mut found_model = match found_model {
+        Some(model) => model,
+        None => return Err(StatusCode::NOT_FOUND),
+    };
+
+    // let mut todo = db
+    //     .read()
+    //     .unwrap()
+    //     .get(&id)
+    //     .cloned()
+    //     .ok_or(StatusCode::NOT_FOUND)?;
+    if let Some(text) = input.text {
+        found_model.text = text;
+    }
+    if let Some(completed) = input.completed {
+        found_model.completed = completed;
+    }
+    let updated_model = MutationCore::update_todo_by_id(&state.conn, id, found_model)
+        .await
+        .expect("Cannot update todo");
+
+    Ok(Json(Todo {
+        id: updated_model.id,
+        text: updated_model.text,
+        completed: updated_model.completed,
+    }))
+}
+
 // async fn todos_delete(Path(id): Path<Uuid>, State(db): State<Db>) -> impl IntoResponse {
 //     if db.write().unwrap().remove(&id).is_some() {
 //         StatusCode::NO_CONTENT
@@ -163,7 +180,7 @@ struct UpdateTodo {
 //         StatusCode::NOT_FOUND
 //     }
 // }
-//
+
 pub fn add(left: usize, right: usize) -> usize {
     left + right
 }
