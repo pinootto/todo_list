@@ -24,12 +24,7 @@ use dotenvy::dotenv;
 use reqwest;
 use serde::{Deserialize, Serialize};
 use std::env;
-use std::{
-    collections::HashMap,
-    net::SocketAddr,
-    sync::{Arc, RwLock},
-};
-use uuid::Uuid;
+use std::net::SocketAddr;
 
 #[tokio::main]
 pub async fn main() {
@@ -56,7 +51,7 @@ pub async fn main() {
         .route("/todos", get(todos_index))
         .route("/todos", post(todos_create))
         .route("/todos/:id", put(todos_update))
-        // .route("/todos/:id", delete(todos_delete))
+        .route("/todos/:id", delete(todos_delete))
         .with_state(state);
 
     let address = SocketAddr::from(([127, 0, 0, 1], 3000));
@@ -118,11 +113,6 @@ async fn todos_create(
     )
     .await
     .expect("Cannot create todo");
-
-    // println!("{:#?}", active_model);
-    // println!("{:#?}", active_model.id.unwrap());
-    // let model: entity::todo::Model = active_model.try_into_model().unwrap();
-    //
     let todo = Todo {
         id: active_model.id.unwrap(),
         text: active_model.text.unwrap(),
@@ -149,13 +139,6 @@ async fn todos_update(
         Some(model) => model,
         None => return Err(StatusCode::NOT_FOUND),
     };
-
-    // let mut todo = db
-    //     .read()
-    //     .unwrap()
-    //     .get(&id)
-    //     .cloned()
-    //     .ok_or(StatusCode::NOT_FOUND)?;
     if let Some(text) = input.text {
         found_model.text = text;
     }
@@ -165,7 +148,6 @@ async fn todos_update(
     let updated_model = MutationCore::update_todo_by_id(&state.conn, id, found_model)
         .await
         .expect("Cannot update todo");
-
     Ok(Json(Todo {
         id: updated_model.id,
         text: updated_model.text,
@@ -173,13 +155,12 @@ async fn todos_update(
     }))
 }
 
-// async fn todos_delete(Path(id): Path<Uuid>, State(db): State<Db>) -> impl IntoResponse {
-//     if db.write().unwrap().remove(&id).is_some() {
-//         StatusCode::NO_CONTENT
-//     } else {
-//         StatusCode::NOT_FOUND
-//     }
-// }
+async fn todos_delete(Path(id): Path<i32>, State(state): State<AppState>) -> impl IntoResponse {
+    match MutationCore::delete_todo(&state.conn, id).await {
+        Ok(_) => StatusCode::NO_CONTENT,
+        Err(_) => StatusCode::NOT_FOUND,
+    }
+}
 
 pub fn add(left: usize, right: usize) -> usize {
     left + right
